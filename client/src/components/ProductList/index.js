@@ -5,6 +5,7 @@ import ProductItem from '../ProductItem';
 import { QUERY_PRODUCTS } from '../../utils/queries';
 import { useStoreContext } from '../../utils/GlobalState';
 import { UPDATE_PRODUCTS } from '../../utils/actions';
+import { idbPromise } from '../../utils/helpers';
 import spinner from '../../assets/spinner.gif';
 
 function ProductList() {
@@ -15,13 +16,29 @@ function ProductList() {
   const { loading, data } = useQuery(QUERY_PRODUCTS);
 
   useEffect(() => {
+    // if there's data to be stored
     if (data) {
+      // store it in the global state object
       dispatch({
         type: UPDATE_PRODUCTS,
         products: data.products,
       });
+
+      // and also to IndexedDB
+      data.products.forEach((product) => {
+        idbPromise('products', 'put', product);
+      });
+    } else if (!loading) {
+      // if loading is undefined from the useQuery hook, we've not connected to the Apollo server, so use the IndexedDB backup
+      idbPromise('products', 'get').then((products) => {
+        // use retrieved data to set global state for offline browsing
+        dispatch({
+          type: UPDATE_PRODUCTS,
+          products: products,
+        });
+      });
     }
-  }, [data, dispatch]);
+  }, [data, loading, dispatch]);
 
   function filterProducts() {
     if (!currentCategory) {
